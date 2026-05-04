@@ -5,19 +5,19 @@ mkdir -p $m
 blkid /dev/vdb||mkfs.ext4 /dev/vdb
 mountpoint -q $m||mount /dev/vdb $m
 grep -q /dev/vdb /etc/fstab||echo "/dev/vdb $m ext4 defaults 0 2">>/etc/fstab
-mkdir -p $m/dk $m/ac $m/bin $m/lib $m/svc $m/tmp $m/apt-lists
+mkdir -p $m/dk $m/ac $m/bin $m/lib $m/svc
 
 [ -L /var/lib/docker ]||(rm -rf /var/lib/docker&&ln -s $m/dk /var/lib/docker)
 [ -L /var/cache/apt ]||(rm -rf /var/cache/apt&&ln -s $m/ac /var/cache/apt)
-[ -L /var/lib/apt/lists ]||(rm -rf /var/lib/apt/lists&&ln -s $m/apt-lists /var/lib/apt/lists)
 
 ip link set dev enp1s0 mtu 1350
 
 if [ ! -f $m/bin/docker ];then
-  # Use PVC for apt temp to avoid root disk space issues, but keep /tmp intact
-  chmod 1777 $m/tmp
-  TMPDIR=$m/tmp apt-get update
-  TMPDIR=$m/tmp DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io nordvpn
+  apt-get clean
+  rm -rf /var/lib/apt/lists
+  mkdir -p /var/lib/apt/lists/partial
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io nordvpn
   cp -a /usr/bin/docker /usr/bin/dockerd /usr/bin/docker-init /usr/bin/docker-proxy $m/bin/ 2>/dev/null||true
   cp -a /usr/sbin/containerd* /usr/sbin/runc $m/bin/ 2>/dev/null||true
   cp -a /usr/sbin/nordvpnd /usr/bin/nordvpn $m/bin/ 2>/dev/null||true
