@@ -14,10 +14,18 @@ ip link set dev enp1s0 mtu 1350
 
 if [ ! -f $m/bin/docker ];then
   apt-get clean
-  rm -rf /var/lib/apt/lists
-  mkdir -p /var/lib/apt/lists/partial
   apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io nordvpn
+  DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io
+
+  # Add NordVPN repo and install
+  curl -sSf https://downloads.nordcdn.com/apps/linux/install.sh | sh -s -- --no-daemon 2>/dev/null||true
+  # fallback: manual repo add
+  if ! command -v nordvpn &>/dev/null; then
+    curl -fsSL https://repo.nordvpn.com/gpg/nordvpn_public.asc | gpg --dearmor -o /usr/share/keyrings/nordvpn.gpg
+    echo "deb [signed-by=/usr/share/keyrings/nordvpn.gpg] https://repo.nordvpn.com/deb/nordvpn/debian stable main" > /etc/apt/sources.list.d/nordvpn.list
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y nordvpn
+  fi
+
   cp -a /usr/bin/docker /usr/bin/dockerd /usr/bin/docker-init /usr/bin/docker-proxy $m/bin/ 2>/dev/null||true
   cp -a /usr/sbin/containerd* /usr/sbin/runc $m/bin/ 2>/dev/null||true
   cp -a /usr/sbin/nordvpnd /usr/bin/nordvpn $m/bin/ 2>/dev/null||true
@@ -35,6 +43,6 @@ fi
 mkdir -p /etc/docker
 printf '{"data-root":"/var/lib/docker","exec-opts":["native.cgroupdriver=cgroupfs"],"storage-driver":"overlay2"}' > /etc/docker/daemon.json
 systemctl daemon-reload
-systemctl enable --now nordvpnd containerd docker
-nordvpn set technology openvpn&&nordvpn set protocol tcp
-nordvpn set ipv6 off&&nordvpn whitelist add port 22
+systemctl enable --now containerd docker
+command -v nordvpnd && systemctl enable --now nordvpnd || true
+command -v nordvpn && nordvpn set technology openvpn && nordvpn set protocol tcp && nordvpn set ipv6 off && nordvpn whitelist add port 22 || true
